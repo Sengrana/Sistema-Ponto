@@ -120,8 +120,8 @@
 
     <div class="card" id="login-box">
         <h2>Área de Acesso</h2>
-        <input type="email" id="email" placeholder="Seu e-mail profissional">
-        <input type="password" id="senha" placeholder="Sua senha">
+        <input type="email" id="email" placeholder="Seu e-mail profissional" autocomplete="off">
+        <input type="password" id="senha" placeholder="Sua senha" autocomplete="current-password">
         <button onclick="fazerLogin()">Entrar</button>
     </div>
 
@@ -164,6 +164,23 @@
 
         let dadosUsuarioLogado = null;
         let meuGrafico = null;
+
+        // Coordenadas da empresa e tolerância de 50 metros
+        const EMPRESA_LAT = -27.34429378622745;
+        const EMPRESA_LON = -51.61002715891619;
+        const RAIO_MAXIMO_METROS = 50; 
+
+        function calcularDistancia(lat1, lon1, lat2, lon2) {
+            function toRad(x) { return x * Math.PI / 180; }
+            var R = 6371000;
+            var dLat = toRad(lat2 - lat1);
+            var dLon = toRad(lon2 - lon1);
+            var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -210,22 +227,56 @@
         window.baterPonto = async function(tipo) {
             if (!dadosUsuarioLogado) return;
 
-            try {
-                await addDoc(collection(db, "registros"), {
-                    uid: auth.currentUser.uid,
-                    nome: dadosUsuarioLogado.nome,
-                    email: dadosUsuarioLogado.email,
-                    tipo_batida: tipo,
-                    data_hora: new Date().toISOString()
-                });
-                alert(`Ponto de ${tipo} registrado com sucesso!`);
-                calcularHorasExtras(auth.currentUser.uid);
-            } catch (error) {
-                alert("Erro ao registrar ponto: " + error.message);
+            if (!navigator.geolocation) {
+                alert("Seu navegador não suporta geolocalização.");
+                return;
             }
+
+            alert("Obtendo sua localização com alta precisão, aguarde...");
+
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const latUsuario = position.coords.latitude;
+                const lonUsuario = position.coords.longitude;
+                const precisaoGPS = position.coords.accuracy;
+
+                const distancia = calcularDistancia(latUsuario, lonUsuario, EMPRESA_LAT, EMPRESA_LON);
+
+                if (distancia > RAIO_MAXIMO_METROS) {
+                    alert(`Ponto negado! Você está a aproximadamente ${Math.round(distancia)} metros da empresa. O limite máximo permitido é de ${RAIO_MAXIMO_METROS} metros.`);
+                    return;
+                }
+
+                try {
+                    await addDoc(collection(db, "registros"), {
+                        uid: auth.currentUser.uid,
+                        nome: dadosUsuarioLogado.nome,
+                        email: dadosUsuarioLogado.email,
+                        tipo_batida: tipo,
+                        data_hora: new Date().toISOString(),
+                        localizacao: { lat: latUsuario, lon: lonUsuario, precisao_metros: Math.round(precisaoGPS) }
+                    });
+                    alert(`Ponto de ${tipo} registrado com sucesso! (Distância: ${Math.round(distancia)}m da empresa)`);
+                    calcularHorasExtras(auth.currentUser.uid);
+                } catch (error) {
+                    alert("Erro ao registrar ponto: " + error.message);
+                }
+
+            }, (error) => {
+                let mensagemErro = "Não foi possível obter sua localização. ";
+                if (error.code === error.PERMISSION_DENIED) {
+                    mensagemErro += "Você precisa permitir o acesso à localização no navegador/celular.";
+                } else {
+                    mensagemErro += "Certifique-se de que o GPS está ativado. Erro: " + error.message;
+                }
+                alert(mensagemErro);
+            }, {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            });
         };
 
-       async function calcularHorasExtras(uid) {
+        async function calcularHorasExtras(uid) {
             try {
                 const q = query(collection(db, "registros"), where("uid", "==", uid));
                 const querySnapshot = await getDocs(q);
@@ -233,18 +284,14 @@
                 let registros = [];
                 querySnapshot.forEach((docSnap) => {
                     let reg = docSnap.data();
-                    
-                    // Valida se a data existe e não é "Invalid Date"
                     if (reg.data_hora) {
                         let dataValida = new Date(reg.data_hora);
-                        // Se foi salvo em ISO string ou formato válido
                         if (!isNaN(dataValida.getTime())) {
                             registros.push({ ...reg, data_obj: dataValida });
                         }
                     }
                 });
 
-                // Ordena os registros cronologicamente do mais antigo para o mais recente
                 registros.sort((a, b) => a.data_obj - b.data_obj);
 
                 let totalMinutosTrabalhados = 0;
@@ -255,25 +302,21 @@
                     let dataDia = reg.data_obj.toISOString().split('T')[0];
 
                     if (reg.tipo_batida === "Entrada") {
-                        // Se já havia uma entrada aberta, substitui ou desconsidera a anterior para evitar travar
                         ultimaEntrada = reg.data_obj;
                     } else if (reg.tipo_batida === "Saida" && ultimaEntrada) {
-                        // Garante que a saída é posterior à entrada
                         if (reg.data_obj > ultimaEntrada) {
                             let diffMs = reg.data_obj - ultimaEntrada;
                             let diffMinutos = Math.floor(diffMs / (1000 * 60));
-                            
-                            // Ignora turnos absurdos (ex: mais de 16 horas seguidas por erro de batida)
                             if (diffMinutos > 0 && diffMinutos < 960) {
                                 totalMinutosTrabalhados += diffMinutos;
                                 diasTrabalhados.add(dataDia);
                             }
                         }
-                        ultimaEntrada = null; // Reseta o ciclo
+                        ultimaEntrada = null;
                     }
                 });
 
-                let minutosEsperados = diasTrabalhados.size * 480; // 8 horas diárias
+                let minutosEsperados = diasTrabalhados.size * 480;
                 let minutosExtras = totalMinutosTrabalhados - minutosEsperados;
                 if (minutosExtras < 0) minutosExtras = 0;
 
