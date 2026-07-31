@@ -2,16 +2,98 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Painel Administrativo - Relatórios</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 420px; text-align: center; }
-        input, select, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background: #218838; }
+        :root {
+            --primary: #4f46e5;
+            --success: #10b981;
+            --success-hover: #059669;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 440px;
+            box-sizing: border-box;
+        }
+
+        h2, h3 {
+            margin-top: 0;
+            color: var(--text);
+            font-size: 1.25rem;
+        }
+
+        h2 { text-align: center; font-size: 1.5rem; }
+
+        input, select, button {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 8px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        button {
+            background: var(--success);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:hover { background: var(--success-hover); }
+        button:active { transform: scale(0.98); }
+
         .voltar { background: #6c757d; }
-        .relatorio { text-align: left; margin-top: 10px; max-height: 160px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; }
-        hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+        .voltar:hover { background: #5a6268; }
+
+        .relatorio {
+            text-align: left;
+            margin-top: 10px;
+            max-height: 160px;
+            overflow-y: auto;
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            border: 1px solid #e5e7eb;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid #e5e7eb;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
@@ -22,8 +104,8 @@
         
         <h3>Cadastrar Funcionário</h3>
         <input type="text" id="nome" placeholder="Nome Completo">
-        <input type="email" id="email" placeholder="E-mail">
-        <input type="password" id="senha" placeholder="Senha Temporária">
+        <input type="email" id="email" placeholder="E-mail profissional">
+        <input type="password" id="senha" placeholder="Senha temporária">
         <select id="tipo">
             <option value="funcionario">Funcionário</option>
             <option value="admin">Administrador</option>
@@ -32,13 +114,13 @@
 
         <hr>
 
-        <h3>Consultar Funcionário Específico</h3>
+        <h3>Consultar Histórico</h3>
         <select id="select-funcionario" onchange="carregarDadosFuncionarioAdmin()">
             <option value="">Selecione um funcionário...</option>
         </select>
 
         <div class="relatorio" id="resultado-admin">
-            Selecione um funcionário acima para ver o histórico detalhado.
+            Selecione um funcionário acima para ver os registros.
         </div>
 
         <button class="voltar" onclick="window.location.href='index.html'" style="margin-top: 15px;">Voltar ao Início</button>
@@ -63,7 +145,6 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Cadastrar Novo Usuário
         window.cadastrarFuncionario = async function() {
             const nome = document.getElementById('nome').value;
             const email = document.getElementById('email').value;
@@ -89,13 +170,12 @@
                 document.getElementById('nome').value = '';
                 document.getElementById('email').value = '';
                 document.getElementById('senha').value = '';
-                carregarListaFuncionarios(); // Atualiza o select
+                carregarListaFuncionarios();
             } catch (error) {
                 alert("Erro ao cadastrar: " + error.message);
             }
         };
 
-        // Carrega a lista de funcionários no <select> do Admin
         async function carregarListaFuncionarios() {
             const querySnapshot = await getDocs(collection(db, "usuarios"));
             const select = document.getElementById('select-funcionario');
@@ -104,13 +184,12 @@
             querySnapshot.forEach((docSnap) => {
                 const user = docSnap.data();
                 const opt = document.createElement('option');
-                opt.value = docSnap.id; // UID
+                opt.value = docSnap.id;
                 opt.innerText = `${user.nome} (${user.tipo})`;
                 select.appendChild(opt);
             });
         }
 
-        // Busca registros do funcionário selecionado pelo Admin
         window.carregarDadosFuncionarioAdmin = async function() {
             const uidSelecionado = document.getElementById('select-funcionario').value;
             const container = document.getElementById('resultado-admin');
@@ -131,7 +210,8 @@
             } else {
                 querySnapshot.forEach((doc) => {
                     const reg = doc.data();
-                    html += `<li><b>${reg.tipo_batida}:</b> ${reg.data_hora}</li>`;
+                    let dataFormatada = new Date(reg.data_hora).toLocaleString("pt-BR");
+                    html += `<li><b>${reg.tipo_batida}:</b> ${dataFormatada}</li>`;
                 });
                 html += "</ul>";
             }
