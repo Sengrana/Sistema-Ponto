@@ -225,7 +225,7 @@
             }
         };
 
-        async function calcularHorasExtras(uid) {
+       async function calcularHorasExtras(uid) {
             try {
                 const q = query(collection(db, "registros"), where("uid", "==", uid));
                 const querySnapshot = await getDocs(q);
@@ -233,12 +233,18 @@
                 let registros = [];
                 querySnapshot.forEach((docSnap) => {
                     let reg = docSnap.data();
-                    let dataValida = new Date(reg.data_hora);
-                    if (!isNaN(dataValida)) {
-                        registros.push({ ...reg, data_obj: dataValida });
+                    
+                    // Valida se a data existe e não é "Invalid Date"
+                    if (reg.data_hora) {
+                        let dataValida = new Date(reg.data_hora);
+                        // Se foi salvo em ISO string ou formato válido
+                        if (!isNaN(dataValida.getTime())) {
+                            registros.push({ ...reg, data_obj: dataValida });
+                        }
                     }
                 });
 
+                // Ordena os registros cronologicamente do mais antigo para o mais recente
                 registros.sort((a, b) => a.data_obj - b.data_obj);
 
                 let totalMinutosTrabalhados = 0;
@@ -249,19 +255,25 @@
                     let dataDia = reg.data_obj.toISOString().split('T')[0];
 
                     if (reg.tipo_batida === "Entrada") {
+                        // Se já havia uma entrada aberta, substitui ou desconsidera a anterior para evitar travar
                         ultimaEntrada = reg.data_obj;
                     } else if (reg.tipo_batida === "Saida" && ultimaEntrada) {
-                        let diffMs = reg.data_obj - ultimaEntrada;
-                        let diffMinutos = Math.floor(diffMs / (1000 * 60));
-                        if (diffMinutos > 0) {
-                            totalMinutosTrabalhados += diffMinutos;
-                            diasTrabalhados.add(dataDia);
+                        // Garante que a saída é posterior à entrada
+                        if (reg.data_obj > ultimaEntrada) {
+                            let diffMs = reg.data_obj - ultimaEntrada;
+                            let diffMinutos = Math.floor(diffMs / (1000 * 60));
+                            
+                            // Ignora turnos absurdos (ex: mais de 16 horas seguidas por erro de batida)
+                            if (diffMinutos > 0 && diffMinutos < 960) {
+                                totalMinutosTrabalhados += diffMinutos;
+                                diasTrabalhados.add(dataDia);
+                            }
                         }
-                        ultimaEntrada = null;
+                        ultimaEntrada = null; // Reseta o ciclo
                     }
                 });
 
-                let minutosEsperados = diasTrabalhados.size * 480;
+                let minutosEsperados = diasTrabalhados.size * 480; // 8 horas diárias
                 let minutosExtras = totalMinutosTrabalhados - minutosEsperados;
                 if (minutosExtras < 0) minutosExtras = 0;
 
@@ -299,6 +311,7 @@
                     }
                 });
             } catch (err) {
+                console.error(err);
                 document.getElementById('status-horas-extras').innerText = "Erro ao calcular horas.";
             }
         }
