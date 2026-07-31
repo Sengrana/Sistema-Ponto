@@ -1,1 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Painel - Registro de Ponto</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --success: #10b981;
+            --success-hover: #059669;
+            --warning: #f59e0b;
+            --warning-hover: #d97706;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 480px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        h2 { margin-top: 0; font-size: 1.4rem; }
+        
+        .info-jornada {
+            background: #eef2ff;
+            color: #3730a3;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 6px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:active { transform: scale(0.98); }
+
+        .btn-bater { background: var(--success); }
+        .btn-bater:hover { background: var(--success-hover); }
+
+        .btn-solicitar { background: var(--warning); }
+        .btn-solicitar:hover { background: var(--warning-hover); }
+
+        .btn-sair { background: #6c757d; }
+        .btn-sair:hover { background: #5a6268; }
+
+        .relatorio {
+            text-align: left;
+            margin-top: 10px;
+            max-height: 140px;
+            overflow-y: auto;
+            background: #f9fafb;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .registro-item {
+            margin-bottom: 6px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 6px;
+        }
+
+        hr { border: 0; border-top: 1px solid #e5e7eb; margin: 15px 0; }
+    </style>
+    <!-- SDK do EmailJS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function() {
+            emailjs.init("7MM-4z4Krdn0908Hc");
+        })();
+    </script>
+</head>
+<body>
+    <div class="card">
+        <h2>Painel do Funcionário</h2>
+        <p id="saudacao" style="color: var(--text-light); margin-bottom: 10px;">Carregando dados...</p>
+        
+        <div class="info-jornada" id="info-jornada">
+            Jornada padrão: Carregando...
+        </div>
+
+        <button class="btn-bater" id="btn-acao-ponto" onclick="baterPonto()">Carregando...</button>
+        <button class="btn-solicitar" onclick="abrirModalSolicitacao()">Solicitar Ajuste / Correção de Ponto</button>
+
+        <hr>
+
+        <h3 style="font-size: 0.95rem; text-align: left; margin-bottom: 5px;">Seu Histórico Recente</h3>
+        <div class="relatorio" id="meu-historico">
+            Carregando registros...
+        </div>
+
+        <h3 style="font-size: 0.95rem; text-align: left; margin-top: 12px; margin-bottom: 5px;">Status das Suas Solicitações</h3>
+        <div class="relatorio" id="minhas-solicitacoes" style="max-height: 100px;">
+            Carregando solicitações...
+        </div>
+
+        <button class="btn-sair" onclick="sair()" style="margin-top: 12px;">Sair da Conta</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
+            authDomain: "sistemaponto-f4263.firebaseapp.com",
+            projectId: "sistemaponto-f4263",
+            storageBucket: "sistemaponto-f4263.firebasestorage.app",
+            messagingSenderId: "705613037858",
+            appId: "1:705613037858:web:8c364ffcfb05074596257b",
+            measurementId: "G-GRL6HE1KZM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let usuarioAtualUid = null;
+        let dadosUsuario = null;
+        let proximoTipoBatida = "entrada1";
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                usuarioAtualUid = user.uid;
+                const docRef = doc(db, "usuarios", user.uid);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    dadosUsuario = docSnap.data();
+                    document.getElementById('saudacao').innerText = `Olá, ${dadosUsuario.nome}`;
+                    
+                    document.getElementById('info-jornada').innerHTML = `
+                        <b>Sua Jornada Padrão:</b><br>
+                        Entrada 1: ${dadosUsuario.entrada1 || '08:00'} | Saída 1: ${dadosUsuario.saida1 || '12:00'}<br>
+                        Entrada 2: ${dadosUsuario.entrada2 || '13:00'} | Saída 2: ${dadosUsuario.saida2 || '17:00'}
+                    `;
+                }
+                await atualizarEstadoBotao();
+                carregarMeuHistorico();
+                carregarMinhasSolicitacoes();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        async function atualizarEstadoBotao() {
+            const q = query(collection(db, "registros"), where("uid", "==", usuarioAtualUid));
+            const querySnapshot = await getDocs(q);
+            
+            let registrosHoje = [];
+            let hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+
+            querySnapshot.forEach(docSnap => {
+                let reg = docSnap.data();
+                let dataReg = new Date(reg.data_hora).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                if (dataReg === hojeStr) registrosHoje.push(reg);
+            });
+
+            registrosHoje.sort((a, b) => new Date(a.data_hora) - new Date(b.data_hora));
+            const btn = document.getElementById('btn-acao-ponto');
+            
+            if (registrosHoje.length === 0) {
+                proximoTipoBatida = "entrada1";
+                btn.innerText = "Registrar Entrada 1";
+            } else if (registrosHoje.length === 1) {
+                proximoTipoBatida = "saida1";
+                btn.innerText = "Registrar Saída 1 (Almoço)";
+            } else if (registrosHoje.length === 2) {
+                proximoTipoBatida = "entrada2";
+                btn.innerText = "Registrar Entrada 2 (Retorno)";
+            } else if (registrosHoje.length === 3) {
+                proximoTipoBatida = "saida2";
+                btn.innerText = "Registrar Saída 2 (Fim)";
+            } else {
+                proximoTipoBatida = "Concluído";
+                btn.innerText = "Jornada de Hoje Concluída";
+                btn.style.background = "#9ca3af";
+                btn.disabled = true;
+            }
+        }
+
+        window.baterPonto = async function() {
+            if (!usuarioAtualUid || proximoTipoBatida === "Concluído") return;
+
+            let agoraIso = new Date().toISOString();
+            let dataFormatada = new Date(agoraIso).toLocaleString("pt-BR", { timeZone: 'America/Sao_Paulo' });
+
+            try {
+                await addDoc(collection(db, "registros"), {
+                    uid: usuarioAtualUid,
+                    tipo_batida: proximoTipoBatida,
+                    data_hora: agoraIso
+                });
+
+                if (dadosUsuario && dadosUsuario.email) {
+                    emailjs.send("service_78gp0c7", "template_8unz7ni", {
+                        to_email: dadosUsuario.email,
+                        to_name: dadosUsuario.nome,
+                        titulo: "Comprovante de Registro de Ponto",
+                        mensagem: `Olá ${dadosUsuario.nome},\n\nSeu ponto do tipo [${proximoTipoBatida}] foi registrado com sucesso em: ${dataFormatada}.`
+                    }).catch(err => console.error("Erro ao enviar e-mail:", err));
+                }
+
+                alert(`Ponto registrado com sucesso (${proximoTipoBatida})! Um comprovante foi enviado para seu e-mail.`);
+                await atualizarEstadoBotao();
+                carregarMeuHistorico();
+            } catch (error) {
+                alert("Erro ao registrar ponto: " + error.message);
+            }
+        };
+
+        window.abrirModalSolicitacao = async function() {
+            let dataAlvo = prompt("Informe a data que deseja ajustar (Formato: AAAA-MM-DD):", new Date().toISOString().slice(0,10));
+            if (!dataAlvo) return;
+
+            let tipoAlvo = prompt("Qual marcação deseja alterar? (Ex: entrada1, saida1, entrada2, saida2):");
+            if (!tipoAlvo) return;
+
+            let novoHorario = prompt("Informe a nova hora correta (Formato HH:MM, ex: 08:15):");
+            if (!novoHorario) return;
+
+            let justificativa = prompt("Justifique o motivo da alteração:");
+            if (!justificativa) {
+                alert("A justificativa é obrigatória para solicitar alteração.");
+                return;
+            }
+
+            try {
+                await addDoc(collection(db, "solicitacoes_ajuste"), {
+                    uid: usuarioAtualUid,
+                    nome_funcionario: dadosUsuario.nome,
+                    email_funcionario: dadosUsuario.email,
+                    data_alvo: dataAlvo,
+                    tipo_batida: tipoAlvo,
+                    novo_horario_sugerido: novoHorario,
+                    justificativa: justificativa,
+                    status: "Pendente",
+                    data_solicitacao: new Date().toISOString()
+                });
+
+                alert("Solicitação de ajuste enviada ao administrador com sucesso!");
+                carregarMinhasSolicitacoes();
+            } catch (error) {
+                alert("Erro ao enviar solicitação: " + error.message);
+            }
+        };
+
+        async function carregarMeuHistorico() {
+            const container = document.getElementById('meu-historico');
+            const q = query(collection(db, "registros"), where("uid", "==", usuarioAtualUid));
+            const querySnapshot = await getDocs(q);
+
+            let html = "";
+            if (querySnapshot.empty) {
+                html = "Nenhum registro encontrado.";
+            } else {
+                let arrayRegs = [];
+                querySnapshot.forEach(docSnap => arrayRegs.push(docSnap.data()));
+                arrayRegs.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
+
+                arrayRegs.forEach(reg => {
+                    let dataFormatada = "Data inválida";
+                    let d = new Date(reg.data_hora);
+                    if (!isNaN(d.getTime())) {
+                        dataFormatada = d.toLocaleString("pt-BR", { timeZone: 'America/Sao_Paulo' });
+                    }
+                    html += `<div class="registro-item"><b>${reg.tipo_batida}:</b> ${dataFormatada}</div>`;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        async function carregarMinhasSolicitacoes() {
+            const container = document.getElementById('minhas-solicitacoes');
+            const q = query(collection(db, "solicitacoes_ajuste"), where("uid", "==", usuarioAtualUid));
+            const querySnapshot = await getDocs(q);
+
+            let html = "";
+            if (querySnapshot.empty) {
+                html = "Nenhuma solicitação enviada.";
+            } else {
+                let arraySols = [];
+                querySnapshot.forEach(docSnap => arraySols.push(docSnap.data()));
+                
+                arraySols.forEach(s => {
+                    html += `<div class="registro-item"><b>${s.data_alvo} (${s.tipo_batida}):</b> Status: <span style="color:var(--warning); font-weight:bold;">${s.status}</span></div>`;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        window.sair = function() {
+            signOut(auth).then(() => { window.location.href = 'index.html'; });
+        };
+    </script>
+</body>
+</html>
 
