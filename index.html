@@ -165,7 +165,6 @@
         let dadosUsuarioLogado = null;
         let meuGrafico = null;
 
-        // Coordenadas da empresa e tolerância de 50 metros
         const EMPRESA_LAT = -27.34429378622745;
         const EMPRESA_LON = -51.61002715891619;
         const RAIO_MAXIMO_METROS = 50; 
@@ -232,7 +231,7 @@
                 return;
             }
 
-            alert("Obtendo sua localização com alta precisão, aguarde...");
+            alert("Validando sua localização na empresa, aguarde...");
 
             navigator.geolocation.getCurrentPosition(async (position) => {
                 const latUsuario = position.coords.latitude;
@@ -242,7 +241,7 @@
                 const distancia = calcularDistancia(latUsuario, lonUsuario, EMPRESA_LAT, EMPRESA_LON);
 
                 if (distancia > RAIO_MAXIMO_METROS) {
-                    alert(`Ponto negado! Você está a aproximadamente ${Math.round(distancia)} metros da empresa. O limite máximo permitido é de ${RAIO_MAXIMO_METROS} metros.`);
+                    alert(`Ponto negado! Você está a aproximadamente ${Math.round(distancia)} metros da empresa. O limite máximo permitido para bater ponto é de ${RAIO_MAXIMO_METROS} metros.`);
                     return;
                 }
 
@@ -264,7 +263,7 @@
             }, (error) => {
                 let mensagemErro = "Não foi possível obter sua localização. ";
                 if (error.code === error.PERMISSION_DENIED) {
-                    mensagemErro += "Você precisa permitir o acesso à localização no navegador/celular.";
+                    mensagemErro += "Você precisa permitir o acesso à localização no navegador/celular para bater o ponto.";
                 } else {
                     mensagemErro += "Certifique-se de que o GPS está ativado. Erro: " + error.message;
                 }
