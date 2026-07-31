@@ -2,43 +2,145 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Ponto Eletrônico - Firebase</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ponto Eletrônico</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 380px; text-align: center; }
-        input, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background: #007BFF; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background: #0056b3; }
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #10b981;
+            --success-hover: #059669;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-sizing: border-box;
+            transition: transform 0.3s ease;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            color: var(--text);
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 10px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            background: var(--primary);
+            color: white;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .btn-entrada { background: var(--primary); }
+        .btn-saida { background: var(--danger); }
+        .btn-saida:hover { background: var(--danger-hover); }
+        .btn-admin { background: var(--success); }
+        .btn-admin:hover { background: var(--success-hover); }
+        .btn-logout { background: #9ca3af; }
+        .btn-logout:hover { background: #6b7280; }
+
         .hidden { display: none; }
-        .resumo { font-size: 14px; color: #555; margin: 15px 0 10px 0; text-align: left; background: #f8f9fa; padding: 10px; border-radius: 4px; }
+
+        .resumo {
+            font-size: 13px;
+            color: var(--text-light);
+            margin: 20px 0 15px 0;
+            text-align: left;
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .chart-container {
+            width: 100%;
+            max-width: 280px;
+            margin: 0 auto;
+        }
     </style>
 </head>
 <body>
 
     <div class="card" id="login-box">
-        <h2>Login</h2>
-        <input type="email" id="email" placeholder="E-mail">
-        <input type="password" id="senha" placeholder="Senha">
+        <h2>Área de Acesso</h2>
+        <input type="email" id="email" placeholder="Seu e-mail profissional">
+        <input type="password" id="senha" placeholder="Sua senha">
         <button onclick="fazerLogin()">Entrar</button>
     </div>
 
     <div class="card hidden" id="ponto-box">
-        <h2 id="bem-vindo" style="margin-top: 0;"></h2>
-        <button onclick="baterPonto('Entrada')">Marcar Entrada</button>
-        <button onclick="baterPonto('Saida')" style="background: #dc3545;">Marcar Saída</button>
+        <h2 id="bem-vindo"></h2>
+        <button class="btn-entrada" onclick="baterPonto('Entrada')">Marcar Entrada</button>
+        <button class="btn-saida" onclick="baterPonto('Saida')">Marcar Saída</button>
         
         <div class="resumo">
-            <b>Cálculo de Horas Extras:</b>
-            <div id="status-horas-extras">Calculando...</div>
+            <b>Resumo da Jornada:</b>
+            <div id="status-horas-extras" style="margin-top: 4px;">Calculando...</div>
         </div>
 
-        <div style="width:100%; max-width:340px; margin: auto;">
+        <div class="chart-container">
             <canvas id="graficoHoras"></canvas>
         </div>
 
-        <button id="btn-admin" class="hidden" onclick="window.location.href='admin.html'" style="background: #28a745; margin-top: 15px;">Painel Administrador</button>
-        <button onclick="fazerLogout()" style="background: #6c757d; margin-top: 8px;">Sair da Conta</button>
+        <button id="btn-admin" class="hidden btn-admin" onclick="window.location.href='admin.html'" style="margin-top: 15px;">Painel Administrador</button>
+        <button class="btn-logout" onclick="fazerLogout()">Sair da Conta</button>
     </div>
 
     <script type="module">
@@ -63,7 +165,6 @@
         let dadosUsuarioLogado = null;
         let meuGrafico = null;
 
-        // Monitora automaticamente se o usuário já está logado (evita pedir login ao voltar do admin)
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 const docRef = doc(db, "usuarios", user.uid);
@@ -93,7 +194,6 @@
 
             try {
                 await signInWithEmailAndPassword(auth, email, senha);
-                // O onAuthStateChanged vai capturar o login e abrir o painel automaticamente
             } catch (error) {
                 alert("Erro no login: E-mail ou senha incorretos.");
             }
@@ -133,14 +233,12 @@
                 let registros = [];
                 querySnapshot.forEach((docSnap) => {
                     let reg = docSnap.data();
-                    // Proteção: ignora registros antigos que estejam sem formato ISO válido
                     let dataValida = new Date(reg.data_hora);
                     if (!isNaN(dataValida)) {
                         registros.push({ ...reg, data_obj: dataValida });
                     }
                 });
 
-                // Ordena os registros cronologicamente
                 registros.sort((a, b) => a.data_obj - b.data_obj);
 
                 let totalMinutosTrabalhados = 0;
@@ -163,7 +261,7 @@
                     }
                 });
 
-                let minutosEsperados = diasTrabalhados.size * 480; // 8 horas diárias
+                let minutosEsperados = diasTrabalhados.size * 480;
                 let minutosExtras = totalMinutosTrabalhados - minutosEsperados;
                 if (minutosExtras < 0) minutosExtras = 0;
 
@@ -171,7 +269,7 @@
 
                 document.getElementById('status-horas-extras').innerHTML = `
                     Dias trabalhados: <b>${diasTrabalhados.size}</b><br>
-                    Total Horas Extras: <b style="color: #28a745;">${horasExtrasFormatadas} hrs</b>
+                    Total Horas Extras: <b style="color: var(--success);">${horasExtrasFormatadas} hrs</b>
                 `;
 
                 let horasNormais = Math.max(0, (totalMinutosTrabalhados - minutosExtras) / 60).toFixed(2);
@@ -180,20 +278,23 @@
                 if (meuGrafico) meuGrafico.destroy();
 
                 meuGrafico = new Chart(ctx, {
-                    type: 'bar',
+                    type: 'doughnut',
                     data: {
-                        labels: ['Horas Normais', 'Horas Extras'],
+                        labels: ['Normais', 'Extras'],
                         datasets: [{
-                            label: 'Acumulado (Horas)',
                             data: [horasNormais, horasExtrasFormatadas],
-                            backgroundColor: ['#007BFF', '#28a745'],
-                            borderWidth: 1
+                            backgroundColor: ['#4f46e5', '#10b981'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
                         }]
                     },
                     options: {
                         responsive: true,
-                        scales: {
-                            y: { beginAtZero: true }
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { boxWidth: 12, font: { size: 11 } }
+                            }
                         }
                     }
                 });
