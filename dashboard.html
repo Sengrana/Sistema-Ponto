@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Painel - Registro de Ponto</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --success: #10b981;
+            --success-hover: #059669;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 440px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        h2 { margin-top: 0; color: var(--text); font-size: 1.5rem; }
+        
+        .info-jornada {
+            background: #eef2ff;
+            color: #3730a3;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:active { transform: scale(0.98); }
+
+        .btn-bater { background: var(--success); }
+        .btn-bater:hover { background: var(--success-hover); }
+
+        .btn-sair { background: #6c757d; }
+        .btn-sair:hover { background: #5a6268; }
+
+        .relatorio {
+            text-align: left;
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .registro-item {
+            margin-bottom: 6px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 6px;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid #e5e7eb;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Painel do Funcionário</h2>
+        <p id="saudacao" style="color: var(--text-light); margin-bottom: 15px;">Carregando dados...</p>
+        
+        <div class="info-jornada" id="info-jornada">
+            Sua jornada: Carregando...
+        </div>
+
+        <button class="btn-bater" onclick="baterPonto()">Registrar Ponto Agora</button>
+
+        <hr>
+
+        <h3 style="font-size: 1rem; text-align: left; margin-bottom: 8px;">Seu Histórico Recente</h3>
+        <div class="relatorio" id="meu-historico">
+            Carregando registros...
+        </div>
+
+        <button class="btn-sair" onclick="sair()" style="margin-top: 15px;">Sair da Conta</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
+            authDomain: "sistemaponto-f4263.firebaseapp.com",
+            projectId: "sistemaponto-f4263",
+            storageBucket: "sistemaponto-f4263.firebasestorage.app",
+            messagingSenderId: "705613037858",
+            appId: "1:705613037858:web:8c364ffcfb05074596257b",
+            measurementId: "G-GRL6HE1KZM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let usuarioAtualUid = null;
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                usuarioAtualUid = user.uid;
+                const docRef = doc(db, "usuarios", user.uid);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const dados = docSnap.data();
+                    document.getElementById('saudacao').innerText = `Olá, ${dados.nome}`;
+                    
+                    let entrada = dados.horario_entrada || "08:00";
+                    let saida = dados.horario_saida || "17:00";
+                    document.getElementById('info-jornada').innerText = `Jornada padrão: Entrada às ${entrada} | Saída às ${saida}`;
+                }
+                carregarMeuHistorico();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        window.baterPonto = async function() {
+            if (!usuarioAtualUid) return;
+
+            try {
+                // Descobre se a última batida foi Entrada ou Saída para alternar automaticamente
+                const q = query(collection(db, "registros"), where("uid", "==", usuarioAtualUid));
+                const querySnapshot = await getDocs(q);
+                
+                let registros = [];
+                querySnapshot.forEach(docSnap => registros.push(docSnap.data()));
+                registros.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
+
+                let proximoTipo = "Entrada";
+                if (registros.length > 0) {
+                    proximoTipo = registros[0].tipo_batida === "Entrada" ? "Saída" : "Entrada";
+                }
+
+                await addDoc(collection(db, "registros"), {
+                    uid: usuarioAtualUid,
+                    tipo_batida: proximoTipo,
+                    data_hora: new Date().toISOString()
+                });
+
+                alert(`Ponto registrado com sucesso (${proximoTipo})!`);
+                carregarMeuHistorico();
+            } catch (error) {
+                alert("Erro ao registrar ponto: " + error.message);
+            }
+        };
+
+        async function carregarMeuHistorico() {
+            const container = document.getElementById('meu-historico');
+            const q = query(collection(db, "registros"), where("uid", "==", usuarioAtualUid));
+            const querySnapshot = await getDocs(q);
+
+            let html = "";
+            if (querySnapshot.empty) {
+                html = "Nenhum registro encontrado.";
+            } else {
+                let arrayRegs = [];
+                querySnapshot.forEach(docSnap => arrayRegs.push(docSnap.data()));
+                arrayRegs.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
+
+                arrayRegs.forEach(reg => {
+                    let dataFormatada = "Data inválida";
+                    let d = new Date(reg.data_hora);
+                    if (!isNaN(d.getTime())) {
+                        dataFormatada = d.toLocaleString("pt-BR", { timeZone: 'America/Sao_Paulo' });
+                    }
+                    html += `<div class="registro-item"><b>${reg.tipo_batida}:</b> ${dataFormatada}</div>`;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        window.sair = function() {
+            signOut(auth).then(() => {
+                window.location.href = 'index.html';
+            });
+        };
+    </script>
+</body>
+</html>
