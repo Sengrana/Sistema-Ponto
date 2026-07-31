@@ -64,11 +64,10 @@
             font-size: 15px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
+            transition: background 0.2s;
         }
 
         button:hover { background: var(--primary-hover); }
-        button:active { transform: scale(0.98); }
         
         .error { color: #dc2626; font-size: 13px; margin-top: 10px; display: none; }
     </style>
@@ -95,7 +94,8 @@
             projectId: "sistemaponto-f4263",
             storageBucket: "sistemaponto-f4263.firebasestorage.app",
             messagingSenderId: "705613037858",
-            appId: "1:705613037858:web:8c364ffcfb05074596257b"
+            appId: "1:705613037858:web:8c364ffcfb05074596257b",
+            measurementId: "G-GRL6HE1KZM"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -126,10 +126,10 @@
                         window.location.href = 'dashboard.html';
                     }
                 } else {
-                    throw new Error("Perfil de usuário não encontrado no banco de dados.");
+                    throw new Error("Usuário não encontrado.");
                 }
             } catch (error) {
-                erroDiv.innerText = "Erro ao entrar: Verifique suas credenciais.";
+                erroDiv.innerText = "Erro ao entrar: Verifique e-mail e senha.";
                 erroDiv.style.display = 'block';
                 btn.innerText = 'Entrar';
                 btn.disabled = false;
