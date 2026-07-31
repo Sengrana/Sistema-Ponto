@@ -1,1 +1,466 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Administrador</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --success: #10b981;
+            --success-hover: #059669;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 580px;
+            box-sizing: border-box;
+        }
+
+        h2, h3 { margin-top: 0; color: var(--text); font-size: 1.2rem; }
+        h2 { text-align: center; font-size: 1.4rem; }
+
+        input, select, button {
+            width: 100%;
+            padding: 10px 14px;
+            margin: 6px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 13px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        .grid-horarios { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        label { font-size: 11px; color: var(--text-light); font-weight: 600; display: block; margin-top: 3px; }
+
+        button {
+            background: var(--success);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button:hover { background: var(--success-hover); }
+
+        .btn-acao {
+            background: var(--primary);
+            color: white;
+            padding: 5px 10px;
+            font-size: 11px;
+            width: auto;
+            border-radius: 6px;
+            margin: 0 2px;
+        }
+        .btn-acao:hover { background: #4338ca; }
+
+        .btn-excel {
+            background: #059669;
+            margin-top: 8px;
+        }
+        .btn-excel:hover { background: #047857; }
+
+        .voltar { background: #6c757d; }
+        .voltar:hover { background: #5a6268; }
+
+        .relatorio {
+            text-align: left;
+            margin-top: 8px;
+            max-height: 180px;
+            overflow-y: auto;
+            background: #f9fafb;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .registro-item, .solicitacao-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 6px;
+        }
+
+        hr { border: 0; border-top: 1px solid #e5e7eb; margin: 15px 0; }
+    </style>
+    <!-- SDK do EmailJS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function() {
+            emailjs.init("7MM-4z4Krdn0908Hc");
+        })();
+    </script>
+</head>
+<body>
+    <div class="card">
+        <h2>Painel do Administrador</h2>
+        
+        <hr>
+        
+        <h3>Cadastrar Funcionário e Jornada</h3>
+        <input type="text" id="nome" placeholder="Nome Completo" autocomplete="off">
+        <input type="email" id="email" placeholder="E-mail profissional" autocomplete="off">
+        <input type="password" id="senha" placeholder="Senha temporária" autocomplete="new-password">
+        
+        <select id="tipo">
+            <option value="funcionario">Funcionário</option>
+            <option value="admin">Administrador</option>
+        </select>
+
+        <div class="grid-horarios">
+            <div><label>Entrada 1</label><input type="time" id="entrada1" value="08:00"></div>
+            <div><label>Saída 1</label><input type="time" id="saida1" value="12:00"></div>
+            <div><label>Entrada 2</label><input type="time" id="entrada2" value="13:00"></div>
+            <div><label>Saída 2</label><input type="time" id="saida2" value="17:00"></div>
+        </div>
+
+        <button onclick="cadastrarFuncionario()">Cadastrar Colaborador</button>
+
+        <hr>
+
+        <h3>Solicitações de Ajuste Pendentes</h3>
+        <div class="relatorio" id="lista-solicitacoes">
+            Carregando solicitações...
+        </div>
+
+        <hr>
+
+        <h3>Consultar, Corrigir e Calcular Saldo de Horas</h3>
+        <select id="select-funcionario" onchange="carregarDadosFuncionarioAdmin()">
+            <option value="">Selecione um funcionário...</option>
+        </select>
+
+        <div class="relatorio" id="resultado-admin">
+            Selecione um funcionário acima para ver e editar os registros.
+        </div>
+
+        <button class="btn-excel" onclick="exportarExcel()" id="btn-exportar" style="display:none;">Exportar Relatório do Mês (Excel/CSV)</button>
+
+        <button class="voltar" onclick="window.location.href='index.html'" style="margin-top: 12px;">Sair / Voltar ao Início</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
+            authDomain: "sistemaponto-f4263.firebaseapp.com",
+            projectId: "sistemaponto-f4263",
+            storageBucket: "sistemaponto-f4263.firebasestorage.app",
+            messagingSenderId: "705613037858",
+            appId: "1:705613037858:web:8c364ffcfb05074596257b",
+            measurementId: "G-GRL6HE1KZM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let registrosCacheAdmin = [];
+        let dadosFuncionarioCache = null;
+
+        window.cadastrarFuncionario = async function() {
+            const nome = document.getElementById('nome').value;
+            const email = document.getElementById('email').value;
+            const senha = document.getElementById('senha').value;
+            const tipo = document.getElementById('tipo').value;
+            const entrada1 = document.getElementById('entrada1').value;
+            const saida1 = document.getElementById('saida1').value;
+            const entrada2 = document.getElementById('entrada2').value;
+            const saida2 = document.getElementById('saida2').value;
+
+            if (!nome || !email || !senha) {
+                alert("Preencha todos os campos obrigatórios!");
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+                const user = userCredential.user;
+
+                await setDoc(doc(db, "usuarios", user.uid), {
+                    nome, email, tipo, entrada1, saida1, entrada2, saida2
+                });
+
+                alert("Funcionário cadastrado com sucesso!");
+                document.getElementById('nome').value = '';
+                document.getElementById('email').value = '';
+                document.getElementById('senha').value = '';
+                carregarListaFuncionarios();
+            } catch (error) {
+                alert("Erro ao cadastrar: " + error.message);
+            }
+        };
+
+        async function carregarListaFuncionarios() {
+            const querySnapshot = await getDocs(collection(db, "usuarios"));
+            const select = document.getElementById('select-funcionario');
+            select.innerHTML = '<option value="">Selecione um funcionário...</option>';
+            
+            querySnapshot.forEach((docSnap) => {
+                const user = docSnap.data();
+                const opt = document.createElement('option');
+                opt.value = docSnap.id;
+                opt.innerText = `${user.nome} (${user.tipo})`;
+                select.appendChild(opt);
+            });
+        }
+
+        async function carregarSolicicitacoes() {
+            const container = document.getElementById('lista-solicitacoes');
+            const querySnapshot = await getDocs(collection(db, "solicitacoes_ajuste"));
+
+            let html = "";
+            if (querySnapshot.empty) {
+                html = "Nenhuma solicitação de ajuste pendente.";
+            } else {
+                querySnapshot.forEach((docSnap) => {
+                    let s = docSnap.data();
+                    html += `
+                        <div class="solicitacao-item">
+                            <div><b>${s.nome_funcionario}</b><br>Data: ${s.data_alvo} (${s.tipo_batida} -> ${s.novo_horario_sugerido})<br><i>Motivo: ${s.justificativa}</i></div>
+                            <div>
+                                <button class="btn-acao" onclick="aprovarSolicitacao('${docSnap.id}', '${s.uid}', '${s.email_funcionario}', '${s.data_alvo}', '${s.tipo_batida}', '${s.novo_horario_sugerido}')">Aprovar</button>
+                                <button class="btn-acao" style="background:var(--danger)" onclick="rejeitarSolicitacao('${docSnap.id}', '${s.email_funcionario}')">Rejeitar</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        window.aprovarSolicitacao = async function(idSolicitacao, uidFuncionario, emailFuncionario, dataAlvo, tipoBatida, novoHorario) {
+            try {
+                let novaDataHoraIso = `${dataAlvo}T${novoHorario}:00-03:00`;
+
+                const q = query(collection(db, "registros"), where("uid", "==", uidFuncionario));
+                const snap = await getDocs(q);
+                let regEncontradoId = null;
+
+                snap.forEach(d => {
+                    let r = d.data();
+                    let dStr = new Date(r.data_hora).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                    if (dStr === dataAlvo && r.tipo_batida === tipoBatida) {
+                        regEncontradoId = d.id;
+                    }
+                });
+
+                if (regEncontradoId) {
+                    await updateDoc(doc(db, "registros", regEncontradoId), { data_hora: new Date(novaDataHoraIso).toISOString() });
+                } else {
+                    await addDoc(collection(db, "registros"), {
+                        uid: uidFuncionario,
+                        tipo_batida: tipoBatida,
+                        data_hora: new Date(novaDataHoraIso).toISOString()
+                    });
+                }
+
+                await deleteDoc(doc(db, "solicitacoes_ajuste", idSolicitacao));
+
+                emailjs.send("service_78gp0c7", "template_8unz7ni", {
+                    to_email: emailFuncionario,
+                    titulo: "Solicitação de Ponto Aprovada",
+                    mensagem: `Sua solicitação de ajuste para o dia ${dataAlvo} (${tipoBatida} às ${novoHorario}) foi APROVADA e alterada no sistema.`
+                }).catch(e => console.error(e));
+
+                alert("Solicitação aprovada e ponto atualizado com sucesso!");
+                carregarSolicicitacoes();
+            } catch (error) {
+                alert("Erro ao aprovar: " + error.message);
+            }
+        };
+
+        window.rejeitarSolicitacao = async function(idSolicitacao, emailFuncionario) {
+            try {
+                await deleteDoc(doc(db, "solicitacoes_ajuste", idSolicitacao));
+                emailjs.send("service_78gp0c7", "template_8unz7ni", {
+                    to_email: emailFuncionario,
+                    titulo: "Solicitação de Ponto Recusada",
+                    mensagem: `Sua solicitação recente de ajuste de ponto foi recusada pelo administrador.`
+                }).catch(e => console.error(e));
+
+                alert("Solicitação rejeitada.");
+                carregarSolicicitacoes();
+            } catch (error) {
+                alert("Erro ao rejeitar: " + error.message);
+            }
+        };
+
+        window.carregarDadosFuncionarioAdmin = async function() {
+            const uidSelecionado = document.getElementById('select-funcionario').value;
+            const container = document.getElementById('resultado-admin');
+            const btnExportar = document.getElementById('btn-exportar');
+            
+            if (!uidSelecionado) { 
+                container.innerHTML = "Selecione um funcionário..."; 
+                btnExportar.style.display = 'none';
+                return; 
+            }
+            container.innerHTML = "Carregando registros e calculando horas...";
+
+            const userDoc = await getDoc(doc(db, "usuarios", uidSelecionado));
+            if (userDoc.exists()) dadosFuncionarioCache = userDoc.data();
+
+            const q = query(collection(db, "registros"), where("uid", "==", uidSelecionado));
+            const querySnapshot = await getDocs(q);
+
+            registrosCacheAdmin = [];
+            querySnapshot.forEach((docSnap) => registrosCacheAdmin.push({ id: docSnap.id, ...docSnap.data() }));
+            registrosCacheAdmin.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
+
+            let html = "";
+            if (registrosCacheAdmin.length === 0) {
+                html = "Nenhum registro de ponto encontrado.";
+            } else {
+                let diasUnicos = {};
+                registrosCacheAdmin.forEach(reg => {
+                    let dStr = new Date(reg.data_hora).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                    if (!diasUnicos[dStr]) diasUnicos[dStr] = [];
+                    diasUnicos[dStr].push(reg);
+                });
+
+                let [hE1, mE1] = (dadosFuncionarioCache.entrada1 || "08:00").split(':').map(Number);
+                let [hS1, mS1] = (dadosFuncionarioCache.saida1 || "12:00").split(':').map(Number);
+                let [hE2, mE2] = (dadosFuncionarioCache.entrada2 || "13:00").split(':').map(Number);
+                let [hS2, mS2] = (dadosFuncionarioCache.saida2 || "17:00").split(':').map(Number);
+                let minutosJornadaDiaria = ((hS1*60 + mS1) - (hE1*60 + mE1)) + ((hS2*60 + mS2) - (hE2*60 + mE2));
+
+                let diferencaTotalMinutos = 0;
+
+                // Cálculo com desconto de 10 minutos de tolerância na diferença
+                Object.values(diasUnicos).forEach(regsDia => {
+                    regsDia.sort((a, b) => new Date(a.data_hora) - new Date(b.data_hora));
+                    let minutosTrabalhadosHoje = 0;
+                    for (let i = 0; i < regsDia.length - 1; i += 2) {
+                        let t1 = new Date(regsDia[i].data_hora).getTime();
+                        let t2 = new Date(regsDia[i+1].data_hora).getTime();
+                        minutosTrabalhadosHoje += (t2 - t1) / 60000;
+                    }
+
+                    let diffDia = minutosTrabalhadosHoje - minutosJornadaDiaria;
+                    
+                    if (diffDia > 10) {
+                        diffDia -= 10; // Soma apenas o que passou de 10 min de hora extra
+                    } else if (diffDia < -10) {
+                        diffDia += 10; // Debita apenas o que passou de 10 min de atraso
+                    } else {
+                        diffDia = 0; // Dentro dos 10 minutos, não soma nem debita
+                    }
+
+                    diferencaTotalMinutos += diffDia;
+                });
+
+                let diferencaMinutosArredondada = Math.round(diferencaTotalMinutos);
+                let sinal = diferencaMinutosArredondada >= 0 ? "+" : "-";
+                let diffAbs = Math.abs(diferencaMinutosArredondada);
+                let horasDiff = Math.floor(diffAbs / 60);
+                let minsDiff = diffAbs % 60;
+
+                html += `<div style="background:#eef2ff; padding:8px; border-radius:6px; margin-bottom:8px; font-weight:600; color:#3730a3;">
+                    Balanço Total (desc. 10min tolerância): <span style="color:${diferencaMinutosArredondada >= 0 ? 'var(--success)' : 'var(--danger)'}">${sinal}${horasDiff}h ${minsDiff}m</span>
+                </div>`;
+
+                registrosCacheAdmin.forEach(reg => {
+                    let dataFormatada = "Data inválida";
+                    let d = new Date(reg.data_hora);
+                    if (!isNaN(d.getTime())) dataFormatada = d.toLocaleString("pt-BR", { timeZone: 'America/Sao_Paulo' });
+
+                    html += `
+                        <div class="registro-item">
+                            <div><b>${reg.tipo_batida}:</b> ${dataFormatada}</div>
+                            <button class="btn-acao" onclick="editarPonto('${reg.id}', '${reg.data_hora}')">Editar</button>
+                        </div>
+                    `;
+                });
+            }
+            container.innerHTML = html;
+            btnExportar.style.display = 'block';
+        };
+
+        window.exportarExcel = function() {
+            if (registrosCacheAdmin.length === 0) {
+                alert("Sem dados para exportar.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,Tipo de Batida,Data e Hora\n";
+            registrosCacheAdmin.forEach(reg => {
+                let dStr = new Date(reg.data_hora).toLocaleString("pt-BR", { timeZone: 'America/Sao_Paulo' });
+                csvContent += `"${reg.tipo_batida}","${dStr}"\n`;
+            });
+
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `relatorio_ponto_${dadosFuncionarioCache ? dadosFuncionarioCache.nome : 'funcionario'}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        window.editarPonto = async function(idRegistro, dataAtualStr) {
+            let dataAtualObj = new Date(dataAtualStr);
+            let formatoInput = "";
+            if (!isNaN(dataAtualObj.getTime())) {
+                let options = { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+                let partes = new Intl.DateTimeFormat('sv-SE', options).formatToParts(dataAtualObj);
+                let p = {};
+                partes.forEach(part => p[part.type] = part.value);
+                formatoInput = `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+            }
+
+            let novaDataHoraStr = prompt("Digite a nova data e hora (Horário de Brasília - AAAA-MM-DDTHH:MM):", formatoInput);
+            if (!novaDataHoraStr) return;
+
+            let novaDataObj = new Date(novaDataHoraStr + "-03:00");
+            if (isNaN(novaDataObj.getTime())) { alert("Data ou formato inválido!"); return; }
+
+            try {
+                await updateDoc(doc(db, "registros", idRegistro), { data_hora: novaDataObj.toISOString() });
+                alert("Ponto alterado com sucesso pelo Administrador!");
+                carregarDadosFuncionarioAdmin();
+            } catch (error) {
+                alert("Erro ao atualizar o ponto: " + error.message);
+            }
+        };
+
+        carregarListaFuncionarios();
+        carregarSolicicitacoes();
+    </script>
+</body>
+</html>
 
