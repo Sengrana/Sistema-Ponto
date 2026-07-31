@@ -78,11 +78,12 @@
 
         .btn-editar {
             background: var(--primary);
-            padding: 4px 8px;
+            color: white;
+            padding: 6px 12px;
             font-size: 12px;
             width: auto;
-            margin-left: 5px;
-            border-radius: 4px;
+            border-radius: 6px;
+            margin: 0;
         }
         .btn-editar:hover { background: #4338ca; }
 
@@ -107,7 +108,13 @@
             align-items: center;
             margin-bottom: 8px;
             border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 6px;
+            padding-bottom: 8px;
+        }
+
+        .registro-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
         }
 
         hr {
@@ -234,7 +241,6 @@
                     registrosArray.push({ id: docSnap.id, ...docSnap.data() });
                 });
 
-                // Ordena por data mais recente
                 registrosArray.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
 
                 registrosArray.forEach(reg => {
@@ -256,7 +262,7 @@
 
             let novaDataHoraStr = prompt("Digite a nova data e hora (Formato: AAAA-MM-DDTHH:MM, ex: 2026-07-31T08:00):", formatoInput);
             
-            if (!novaDataHoraStr) return; // Se cancelou
+            if (!novaDataHoraStr) return;
 
             let novaDataObj = new Date(novaDataHoraStr);
             if (isNaN(novaDataObj.getTime())) {
@@ -270,7 +276,7 @@
                     data_hora: novaDataObj.toISOString()
                 });
                 alert("Ponto alterado com sucesso!");
-                carregarDadosFuncionarioAdmin(); // Atualiza a lista na tela
+                carregarDadosFuncionarioAdmin();
             } catch (error) {
                 alert("Erro ao atualizar o ponto: " + error.message);
             }
