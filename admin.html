@@ -35,7 +35,7 @@
             border-radius: 16px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
             width: 100%;
-            max-width: 520px;
+            max-width: 560px;
             box-sizing: border-box;
         }
 
@@ -64,13 +64,10 @@
             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
         }
 
-        .horarios-container {
-            display: flex;
+        .grid-horarios {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
-        }
-
-        .horarios-container div {
-            flex: 1;
         }
 
         label {
@@ -78,7 +75,7 @@
             color: var(--text-light);
             font-weight: 600;
             display: block;
-            margin-top: 5px;
+            margin-top: 4px;
         }
 
         button {
@@ -147,7 +144,7 @@
         
         <hr>
         
-        <h3>Cadastrar Funcionário e Horário Padrão</h3>
+        <h3>Cadastrar Funcionário e Jornada</h3>
         <input type="text" id="nome" placeholder="Nome Completo" autocomplete="off">
         <input type="email" id="email" placeholder="E-mail profissional" autocomplete="off">
         <input type="password" id="senha" placeholder="Senha temporária" autocomplete="new-password">
@@ -157,14 +154,22 @@
             <option value="admin">Administrador</option>
         </select>
 
-        <div class="horarios-container">
+        <div class="grid-horarios">
             <div>
-                <label>Entrada Padrão</label>
-                <input type="time" id="horario_entrada" value="08:00">
+                <label>Entrada 1 (Início)</label>
+                <input type="time" id="entrada1" value="08:00">
             </div>
             <div>
-                <label>Saída Padrão</label>
-                <input type="time" id="horario_saida" value="17:00">
+                <label>Saída 1 (Almoço)</label>
+                <input type="time" id="saida1" value="12:00">
+            </div>
+            <div>
+                <label>Entrada 2 (Retorno)</label>
+                <input type="time" id="entrada2" value="13:00">
+            </div>
+            <div>
+                <label>Saída 2 (Fim)</label>
+                <input type="time" id="saida2" value="17:00">
             </div>
         </div>
 
@@ -208,8 +213,10 @@
             const email = document.getElementById('email').value;
             const senha = document.getElementById('senha').value;
             const tipo = document.getElementById('tipo').value;
-            const horarioEntrada = document.getElementById('horario_entrada').value;
-            const horarioSaida = document.getElementById('horario_saida').value;
+            const entrada1 = document.getElementById('entrada1').value;
+            const saida1 = document.getElementById('saida1').value;
+            const entrada2 = document.getElementById('entrada2').value;
+            const saida2 = document.getElementById('saida2').value;
 
             if (!nome || !email || !senha) {
                 alert("Preencha todos os campos obrigatórios!");
@@ -224,11 +231,13 @@
                     nome: nome,
                     email: email,
                     tipo: tipo,
-                    horario_entrada: horarioEntrada,
-                    horario_saida: horarioSaida
+                    entrada1: entrada1,
+                    saida1: saida1,
+                    entrada2: entrada2,
+                    saida2: saida2
                 });
 
-                alert("Funcionário e horários cadastrados com sucesso!");
+                alert("Funcionário e jornada cadastrados com sucesso!");
                 document.getElementById('nome').value = '';
                 document.getElementById('email').value = '';
                 document.getElementById('senha').value = '';
@@ -247,7 +256,7 @@
                 const user = docSnap.data();
                 const opt = document.createElement('option');
                 opt.value = docSnap.id;
-                opt.innerText = `${user.nome} (${user.tipo}) - Jornada: ${user.horario_entrada || '--:--'} às ${user.horario_saida || '--:--'}`;
+                opt.innerText = `${user.nome} (${user.tipo})`;
                 select.appendChild(opt);
             });
         }
