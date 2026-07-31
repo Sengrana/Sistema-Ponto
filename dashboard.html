@@ -80,7 +80,7 @@
         .relatorio {
             text-align: left;
             margin-top: 10px;
-            max-height: 160px;
+            max-height: 140px;
             overflow-y: auto;
             background: #f9fafb;
             padding: 10px;
@@ -122,6 +122,11 @@
         <h3 style="font-size: 0.95rem; text-align: left; margin-bottom: 5px;">Seu Histórico Recente</h3>
         <div class="relatorio" id="meu-historico">
             Carregando registros...
+        </div>
+
+        <h3 style="font-size: 0.95rem; text-align: left; margin-top: 12px; margin-bottom: 5px;">Status das Suas Solicitações</h3>
+        <div class="relatorio" id="minhas-solicitacoes" style="max-height: 100px;">
+            Carregando solicitações...
         </div>
 
         <button class="btn-sair" onclick="sair()" style="margin-top: 12px;">Sair da Conta</button>
@@ -168,6 +173,7 @@
                 }
                 await atualizarEstadoBotao();
                 carregarMeuHistorico();
+                carregarMinhasSolicitacoes();
             } else {
                 window.location.href = 'index.html';
             }
@@ -269,6 +275,7 @@
                 });
 
                 alert("Solicitação de ajuste enviada ao administrador com sucesso!");
+                carregarMinhasSolicitacoes();
             } catch (error) {
                 alert("Erro ao enviar solicitação: " + error.message);
             }
@@ -294,6 +301,25 @@
                         dataFormatada = d.toLocaleString("pt-BR", { timeZone: 'America/Sao_Paulo' });
                     }
                     html += `<div class="registro-item"><b>${reg.tipo_batida}:</b> ${dataFormatada}</div>`;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        async function carregarMinhasSolicitacoes() {
+            const container = document.getElementById('minhas-solicitacoes');
+            const q = query(collection(db, "solicitacoes_ajuste"), where("uid", "==", usuarioAtualUid));
+            const querySnapshot = await getDocs(q);
+
+            let html = "";
+            if (querySnapshot.empty) {
+                html = "Nenhuma solicitação enviada.";
+            } else {
+                let arraySols = [];
+                querySnapshot.forEach(docSnap => arraySols.push(docSnap.data()));
+                
+                arraySols.forEach(s => {
+                    html += `<div class="registro-item"><b>${s.data_alvo} (${s.tipo_batida}):</b> Status: <span style="color:var(--warning); font-weight:bold;">${s.status}</span></div>`;
                 });
             }
             container.innerHTML = html;
