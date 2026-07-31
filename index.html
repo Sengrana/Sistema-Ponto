@@ -1,34 +1,140 @@
-let dadosUsuarioLogado = null;
-let meuGrafico = null;
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema de Ponto</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+        }
 
-        // Coordenadas da empresa e tolerância de 50 metros
-const EMPRESA_LAT = -27.34429378622745;
-const EMPRESA_LON = -51.61002715891619;
-const RAIO_MAXIMO_METROS = 50; 
-@@ -232,7 +231,7 @@ <h2 id="bem-vindo"></h2>
-return;
-}
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
 
-            alert("Obtendo sua localização com alta precisão, aguarde...");
-            alert("Validando sua localização na empresa, aguarde...");
+        .card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+            text-align: center;
+        }
 
-navigator.geolocation.getCurrentPosition(async (position) => {
-const latUsuario = position.coords.latitude;
-@@ -242,7 +241,7 @@ <h2 id="bem-vindo"></h2>
-const distancia = calcularDistancia(latUsuario, lonUsuario, EMPRESA_LAT, EMPRESA_LON);
+        h2 { margin-top: 0; font-size: 1.5rem; margin-bottom: 20px; }
 
-if (distancia > RAIO_MAXIMO_METROS) {
-                    alert(`Ponto negado! Você está a aproximadamente ${Math.round(distancia)} metros da empresa. O limite máximo permitido é de ${RAIO_MAXIMO_METROS} metros.`);
-                    alert(`Ponto negado! Você está a aproximadamente ${Math.round(distancia)} metros da empresa. O limite máximo permitido para bater ponto é de ${RAIO_MAXIMO_METROS} metros.`);
-return;
-}
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 8px 0 15px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
 
-@@ -264,7 +263,7 @@ <h2 id="bem-vindo"></h2>
-}, (error) => {
-let mensagemErro = "Não foi possível obter sua localização. ";
-if (error.code === error.PERMISSION_DENIED) {
-                    mensagemErro += "Você precisa permitir o acesso à localização no navegador/celular.";
-                    mensagemErro += "Você precisa permitir o acesso à localização no navegador/celular para bater o ponto.";
-} else {
-mensagemErro += "Certifique-se de que o GPS está ativado. Erro: " + error.message;
-}
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:hover { background: var(--primary-hover); }
+        button:active { transform: scale(0.98); }
+        
+        .error { color: #dc2626; font-size: 13px; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Acesso ao Sistema</h2>
+        <form id="loginForm" onsubmit="event.preventDefault(); fazerLogin();">
+            <input type="email" id="email" placeholder="Seu E-mail" required autocomplete="email">
+            <input type="password" id="senha" placeholder="Sua Senha" required autocomplete="current-password">
+            <button type="submit" id="btn-login">Entrar</button>
+            <div id="erro-msg" class="error"></div>
+        </form>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
+            authDomain: "sistemaponto-f4263.firebaseapp.com",
+            projectId: "sistemaponto-f4263",
+            storageBucket: "sistemaponto-f4263.firebasestorage.app",
+            messagingSenderId: "705613037858",
+            appId: "1:705613037858:web:8c364ffcfb05074596257b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.fazerLogin = async function() {
+            const email = document.getElementById('email').value;
+            const senha = document.getElementById('senha').value;
+            const erroDiv = document.getElementById('erro-msg');
+            const btn = document.getElementById('btn-login');
+
+            erroDiv.style.display = 'none';
+            btn.innerText = 'Autenticando...';
+            btn.disabled = true;
+
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, senha);
+                const user = userCredential.user;
+                
+                const docSnap = await getDoc(doc(db, "usuarios", user.uid));
+                
+                if (docSnap.exists()) {
+                    const dados = docSnap.data();
+                    if (dados.tipo === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'dashboard.html';
+                    }
+                } else {
+                    throw new Error("Perfil de usuário não encontrado no banco de dados.");
+                }
+            } catch (error) {
+                erroDiv.innerText = "Erro ao entrar: Verifique suas credenciais.";
+                erroDiv.style.display = 'block';
+                btn.innerText = 'Entrar';
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
