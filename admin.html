@@ -9,6 +9,8 @@
             --primary: #4f46e5;
             --success: #10b981;
             --success-hover: #059669;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
             --bg: #f3f4f6;
             --card-bg: #ffffff;
             --text: #1f2937;
@@ -33,7 +35,7 @@
             border-radius: 16px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
             width: 100%;
-            max-width: 440px;
+            max-width: 480px;
             box-sizing: border-box;
         }
 
@@ -74,19 +76,38 @@
         button:hover { background: var(--success-hover); }
         button:active { transform: scale(0.98); }
 
+        .btn-editar {
+            background: var(--primary);
+            padding: 4px 8px;
+            font-size: 12px;
+            width: auto;
+            margin-left: 5px;
+            border-radius: 4px;
+        }
+        .btn-editar:hover { background: #4338ca; }
+
         .voltar { background: #6c757d; }
         .voltar:hover { background: #5a6268; }
 
         .relatorio {
             text-align: left;
             margin-top: 10px;
-            max-height: 160px;
+            max-height: 220px;
             overflow-y: auto;
             background: #f9fafb;
             padding: 12px;
             border-radius: 8px;
             font-size: 13px;
             border: 1px solid #e5e7eb;
+        }
+
+        .registro-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 6px;
         }
 
         hr {
@@ -114,13 +135,13 @@
 
         <hr>
 
-        <h3>Consultar Histórico</h3>
+        <h3>Consultar e Corrigir Histórico</h3>
         <select id="select-funcionario" onchange="carregarDadosFuncionarioAdmin()">
             <option value="">Selecione um funcionário...</option>
         </select>
 
         <div class="relatorio" id="resultado-admin">
-            Selecione um funcionário acima para ver os registros.
+            Selecione um funcionário acima para ver e editar os registros.
         </div>
 
         <button class="voltar" onclick="window.location.href='index.html'" style="margin-top: 15px;">Voltar ao Início</button>
@@ -129,7 +150,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, updateDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
@@ -204,18 +225,55 @@
             const q = query(collection(db, "registros"), where("uid", "==", uidSelecionado));
             const querySnapshot = await getDocs(q);
 
-            let html = "<ul style='padding-left: 15px; margin: 0;'>";
+            let html = "";
             if (querySnapshot.empty) {
                 html = "Nenhum registro de ponto encontrado.";
             } else {
-                querySnapshot.forEach((doc) => {
-                    const reg = doc.data();
-                    let dataFormatada = new Date(reg.data_hora).toLocaleString("pt-BR");
-                    html += `<li><b>${reg.tipo_batida}:</b> ${dataFormatada}</li>`;
+                let registrosArray = [];
+                querySnapshot.forEach((docSnap) => {
+                    registrosArray.push({ id: docSnap.id, ...docSnap.data() });
                 });
-                html += "</ul>";
+
+                // Ordena por data mais recente
+                registrosArray.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
+
+                registrosArray.forEach(reg => {
+                    let dataFormatada = !isNaN(new Date(reg.data_hora)) ? new Date(reg.data_hora).toLocaleString("pt-BR") : "Data inválida";
+                    html += `
+                        <div class="registro-item">
+                            <div><b>${reg.tipo_batida}:</b> ${dataFormatada}</div>
+                            <button class="btn-editar" onclick="editarPonto('${reg.id}', '${reg.data_hora}')">Editar</button>
+                        </div>
+                    `;
+                });
             }
             container.innerHTML = html;
+        };
+
+        window.editarPonto = async function(idRegistro, dataAtualStr) {
+            let dataAtualObj = new Date(dataAtualStr);
+            let formatoInput = !isNaN(dataAtualObj.getTime()) ? dataAtualObj.toISOString().slice(0, 16) : "";
+
+            let novaDataHoraStr = prompt("Digite a nova data e hora (Formato: AAAA-MM-DDTHH:MM, ex: 2026-07-31T08:00):", formatoInput);
+            
+            if (!novaDataHoraStr) return; // Se cancelou
+
+            let novaDataObj = new Date(novaDataHoraStr);
+            if (isNaN(novaDataObj.getTime())) {
+                alert("Data ou formato inválido! Certifique-se de usar o formato correto (Ano-Mês-Dia T Hora:Minuto).");
+                return;
+            }
+
+            try {
+                const docRef = doc(db, "registros", idRegistro);
+                await updateDoc(docRef, {
+                    data_hora: novaDataObj.toISOString()
+                });
+                alert("Ponto alterado com sucesso!");
+                carregarDadosFuncionarioAdmin(); // Atualiza a lista na tela
+            } catch (error) {
+                alert("Erro ao atualizar o ponto: " + error.message);
+            }
         };
 
         carregarListaFuncionarios();
