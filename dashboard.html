@@ -82,7 +82,7 @@
 <div class="container">
     <h2 id="saudacao">Carregando...</h2>
     
-    <!-- Botão exclusivo para Admin voltar para a tela de administração -->
+    <!-- Botão exclusivo para Admin voltar -->
     <button id="btn-voltar-admin" class="btn-voltar">Voltar ao Painel Admin</button>
 
     <h3>Registrar Ponto</h3>
@@ -104,7 +104,6 @@
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Configuração do Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
         authDomain: "sistemaponto-f4263.firebaseapp.com",
@@ -121,42 +120,41 @@
 
     let usuarioLogado = null;
 
-    // Coordenadas globais da empresa e raio limite
     const EMPRESA_LAT = -27.34429378622745;
     const EMPRESA_LON = -51.61002715891619;
     const RAIO_MAXIMO_METROS = 50;
 
-    // Verifica usuário logado e busca os dados
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             usuarioLogado = user;
-            const docRef = doc(db, "usuarios", user.uid);
-            const docSnap = await getDoc(docRef);
+            try {
+                const docRef = doc(db, "usuarios", user.uid);
+                const docSnap = await getDoc(docRef);
 
-            if (docSnap.exists()) {
-                const dados = docSnap.data();
-                document.getElementById('saudacao').innerText = `Olá, ${dados.nome}`;
-                
-                // Exibe botão de voltar se for admin
-                if (dados.tipo === 'admin') {
-                    document.getElementById('btn-voltar-admin').style.display = 'block';
+                if (docSnap.exists()) {
+                    const dados = docSnap.data();
+                    document.getElementById('saudacao').innerText = `Olá, ${dados.nome}`;
+                    
+                    if (dados.tipo === 'admin') {
+                        document.getElementById('btn-voltar-admin').style.display = 'block';
+                    }
+                    
+                    carregarRegistrosHoje();
+                } else {
+                    document.getElementById('saudacao').innerText = "Erro: Usuário não cadastrado.";
                 }
-                
-                carregarRegistrosHoje();
-            } else {
-                alert("Erro: Usuário não encontrado no banco de dados.");
+            } catch (err) {
+                console.error("Erro ao buscar dados do usuário:", err);
             }
         } else {
             window.location.href = "index.html";
         }
     });
 
-    // Evento do botão Voltar (Admin)
     document.getElementById('btn-voltar-admin').addEventListener('click', () => {
         window.location.href = 'admin.html';
     });
 
-    // Fórmula de Haversine para calcular distância em metros
     function calcularDistancia(lat1, lon1, lat2, lon2) {
         const R = 6371e3; 
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -168,12 +166,11 @@
         return R * c; 
     }
 
-    // Função central para bater o ponto com validação de GPS
     async function baterPonto(tipoBatida) {
         alert("Verificando sua localização pelo GPS. Aguarde...");
 
         if (!navigator.geolocation) {
-            alert("Erro: Seu navegador não suporta geolocalização. Ponto negado.");
+            alert("Erro: Seu navegador não suporta geolocalização.");
             return;
         }
 
@@ -181,16 +178,13 @@
             const latUsuario = position.coords.latitude;
             const lonUsuario = position.coords.longitude;
             
-            // Calcula a distância exata da empresa
             const distancia = calcularDistancia(latUsuario, lonUsuario, EMPRESA_LAT, EMPRESA_LON);
             
-            // BLOQUEIO DE DISTÂNCIA
             if (distancia > RAIO_MAXIMO_METROS) {
                 alert(`PONTO NEGADO! Você está a ${Math.round(distancia)} metros da empresa. O limite máximo é de ${RAIO_MAXIMO_METROS} metros.`);
                 return; 
             }
 
-            // Gravação no Firebase se passar pelo bloqueio
             try {
                 const dataHoraAtual = new Date().toISOString();
                 
@@ -209,9 +203,9 @@
 
         }, (error) => {
             let msg = "Não foi possível verificar a localização.";
-            if (error.code === 1) msg = "PONTO NEGADO: Permissão de GPS não concedida. Autorize o navegador a acessar sua localização.";
-            else if (error.code === 2) msg = "Sinal de GPS indisponível no momento. Vá para uma área aberta.";
-            else if (error.code === 3) msg = "Tempo limite para encontrar o GPS esgotado.";
+            if (error.code === 1) msg = "PONTO NEGADO: Permissão de GPS negada no navegador.";
+            else if (error.code === 2) msg = "Sinal de GPS indisponível.";
+            else if (error.code === 3) msg = "Tempo limite do GPS esgotado.";
             alert(msg);
         }, {
             enableHighAccuracy: true,
@@ -220,48 +214,51 @@
         });
     }
 
-    // Vincula os botões à função de bater ponto
     document.getElementById('btn-entrada').addEventListener('click', () => baterPonto('Entrada'));
     document.getElementById('btn-almoco-ida').addEventListener('click', () => baterPonto('Ida Almoço'));
     document.getElementById('btn-almoco-volta').addEventListener('click', () => baterPonto('Volta Almoço'));
     document.getElementById('btn-saida').addEventListener('click', () => baterPonto('Saída'));
 
-    // Carrega o histórico do dia atual
     async function carregarRegistrosHoje() {
         if (!usuarioLogado) return;
         
-        const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }); // Pega a data no formato YYYY-MM-DD
-        const inicioDia = hoje + "T00:00:00.000-03:00";
-        const fimDia = hoje + "T23:59:59.999-03:00";
+        try {
+            const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+            const inicioDia = new Date(hoje + "T00:00:00-03:00").toISOString();
+            const fimDia = new Date(hoje + "T23:59:59-03:00").toISOString();
 
-        const q = query(
-            collection(db, "registros"),
-            where("uid", "==", usuarioLogado.uid),
-            where("data_hora", ">=", new Date(inicioDia).toISOString()),
-            where("data_hora", "<=", new Date(fimDia).toISOString()),
-            orderBy("data_hora", "asc")
-        );
+            const q = query(
+                collection(db, "registros"),
+                where("uid", "==", usuarioLogado.uid),
+                where("data_hora", ">=", inicioDia),
+                where("data_hora", "<=", fimDia),
+                orderBy("data_hora", "asc")
+            );
 
-        const querySnapshot = await getDocs(q);
-        const lista = document.getElementById('lista-pontos');
-        lista.innerHTML = '';
+            const querySnapshot = await getDocs(q);
+            const lista = document.getElementById('lista-pontos');
+            lista.innerHTML = '';
 
-        if (querySnapshot.empty) {
-            lista.innerHTML = 'Nenhum ponto registrado hoje.';
-            return;
+            if (querySnapshot.empty) {
+                lista.innerHTML = 'Nenhum ponto registrado hoje.';
+                return;
+            }
+
+            querySnapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const dataFormatada = new Date(data.data_hora).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+                lista.innerHTML += `<div class="registro-item"><strong>${data.tipo_batida}</strong> <span>${dataFormatada}</span></div>`;
+            });
+        } catch (e) {
+            console.error("Erro ao carregar registros do dia:", e);
         }
-
-        querySnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const dataFormatada = new Date(data.data_hora).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-            lista.innerHTML += `<div class="registro-item"><strong>${data.tipo_batida}</strong> <span>${dataFormatada}</span></div>`;
-        });
     }
 
-    // Botão Sair
     document.getElementById('btn-sair').addEventListener('click', () => {
         signOut(auth).then(() => {
             window.location.href = "index.html";
+        }).catch((error) => {
+            console.error("Erro ao sair:", error);
         });
     });
 </script>
