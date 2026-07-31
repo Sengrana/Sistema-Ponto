@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel Administrativo - Relatórios</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 420px; text-align: center; }
+        input, select, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #218838; }
+        .voltar { background: #6c757d; }
+        .relatorio { text-align: left; margin-top: 10px; max-height: 160px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Painel do Administrador</h2>
+        
+        <hr>
+        
+        <h3>Cadastrar Funcionário</h3>
+        <input type="text" id="nome" placeholder="Nome Completo">
+        <input type="email" id="email" placeholder="E-mail">
+        <input type="password" id="senha" placeholder="Senha Temporária">
+        <select id="tipo">
+            <option value="funcionario">Funcionário</option>
+            <option value="admin">Administrador</option>
+        </select>
+        <button onclick="cadastrarFuncionario()">Cadastrar</button>
+
+        <hr>
+
+        <h3>Consultar Funcionário Específico</h3>
+        <select id="select-funcionario" onchange="carregarDadosFuncionarioAdmin()">
+            <option value="">Selecione um funcionário...</option>
+        </select>
+
+        <div class="relatorio" id="resultado-admin">
+            Selecione um funcionário acima para ver o histórico detalhado.
+        </div>
+
+        <button class="voltar" onclick="window.location.href='index.html'" style="margin-top: 15px;">Voltar ao Início</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
+            authDomain: "sistemaponto-f4263.firebaseapp.com",
+            projectId: "sistemaponto-f4263",
+            storageBucket: "sistemaponto-f4263.firebasestorage.app",
+            messagingSenderId: "705613037858",
+            appId: "1:705613037858:web:8c364ffcfb05074596257b",
+            measurementId: "G-GRL6HE1KZM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Cadastrar Novo Usuário
+        window.cadastrarFuncionario = async function() {
+            const nome = document.getElementById('nome').value;
+            const email = document.getElementById('email').value;
+            const senha = document.getElementById('senha').value;
+            const tipo = document.getElementById('tipo').value;
+
+            if (!nome || !email || !senha) {
+                alert("Preencha todos os campos!");
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+                const user = userCredential.user;
+
+                await setDoc(doc(db, "usuarios", user.uid), {
+                    nome: nome,
+                    email: email,
+                    tipo: tipo
+                });
+
+                alert("Funcionário cadastrado com sucesso!");
+                document.getElementById('nome').value = '';
+                document.getElementById('email').value = '';
+                document.getElementById('senha').value = '';
+                carregarListaFuncionarios(); // Atualiza o select
+            } catch (error) {
+                alert("Erro ao cadastrar: " + error.message);
+            }
+        };
+
+        // Carrega a lista de funcionários no <select> do Admin
+        async function carregarListaFuncionarios() {
+            const querySnapshot = await getDocs(collection(db, "usuarios"));
+            const select = document.getElementById('select-funcionario');
+            select.innerHTML = '<option value="">Selecione um funcionário...</option>';
+            
+            querySnapshot.forEach((docSnap) => {
+                const user = docSnap.data();
+                const opt = document.createElement('option');
+                opt.value = docSnap.id; // UID
+                opt.innerText = `${user.nome} (${user.tipo})`;
+                select.appendChild(opt);
+            });
+        }
+
+        // Busca registros do funcionário selecionado pelo Admin
+        window.carregarDadosFuncionarioAdmin = async function() {
+            const uidSelecionado = document.getElementById('select-funcionario').value;
+            const container = document.getElementById('resultado-admin');
+            
+            if (!uidSelecionado) {
+                container.innerHTML = "Selecione um funcionário...";
+                return;
+            }
+
+            container.innerHTML = "Carregando registros...";
+
+            const q = query(collection(db, "registros"), where("uid", "==", uidSelecionado));
+            const querySnapshot = await getDocs(q);
+
+            let html = "<ul style='padding-left: 15px; margin: 0;'>";
+            if (querySnapshot.empty) {
+                html = "Nenhum registro de ponto encontrado.";
+            } else {
+                querySnapshot.forEach((doc) => {
+                    const reg = doc.data();
+                    html += `<li><b>${reg.tipo_batida}:</b> ${reg.data_hora}</li>`;
+                });
+                html += "</ul>";
+            }
+            container.innerHTML = html;
+        };
+
+        carregarListaFuncionarios();
+    </script>
+</body>
+</html>
