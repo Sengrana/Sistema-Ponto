@@ -5,76 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel - Bater Ponto</title>
     <style>
-        :root {
-            --primary: #4f46e5;
-            --success: #10b981;
-            --success-hover: #059669;
-            --danger: #ef4444;
-            --danger-hover: #dc2626;
-            --bg: #f3f4f6;
-            --card-bg: #ffffff;
-            --text: #1f2937;
-            --text-light: #6b7280;
-        }
-
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: var(--bg); 
-            color: var(--text);
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            min-height: 100vh;
-            margin: 0;
-            justify-content: center;
-        }
-        
-        .container { 
-            background: var(--card-bg); 
-            padding: 25px; 
-            border-radius: 16px; 
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); 
-            width: 100%; 
-            max-width: 400px; 
-            text-align: center; 
-            box-sizing: border-box;
-        }
-        
-        h2 { margin-top: 0; font-size: 1.4rem; }
-        
-        button { 
-            width: 100%; 
-            padding: 12px; 
-            margin: 8px 0; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            font-size: 14px; 
-            font-weight: 600; 
-            transition: background 0.2s;
-        }
-        
-        .btn-ponto { background-color: var(--success); color: white; }
-        .btn-ponto:hover { background-color: var(--success-hover); }
-        
-        .btn-voltar { background-color: var(--primary); color: white; display: none; margin-bottom: 20px;}
-        .btn-voltar:hover { background-color: #4338ca; }
-        
-        .btn-sair { background-color: var(--danger); color: white; margin-top: 20px; }
-        .btn-sair:hover { background-color: var(--danger-hover); }
-        
-        .historico { margin-top: 20px; text-align: left; background: #f9fafb; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb;}
-        .historico h4 { margin-top: 0; margin-bottom: 10px; color: var(--text-light); font-size: 12px; text-transform: uppercase;}
-        
-        .registro-item { 
-            padding: 8px 0; 
-            border-bottom: 1px solid #e5e7eb; 
-            font-size: 13px; 
-            display: flex;
-            justify-content: space-between;
-        }
-        .registro-item:last-child { border-bottom: none; }
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        button { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .btn-ponto { background-color: #28a745; color: white; }
+        .btn-ponto:hover { background-color: #218838; }
+        .btn-voltar { background-color: #007bff; color: white; display: none; }
+        .btn-voltar:hover { background-color: #0056b3; }
+        .btn-sair { background-color: #dc3545; color: white; margin-top: 20px; }
+        .btn-sair:hover { background-color: #c82333; }
+        .historico { margin-top: 20px; text-align: left; }
+        .registro-item { padding: 8px; border-bottom: 1px solid #ddd; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -104,14 +45,14 @@
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+    // COLOQUE SUAS CHAVES DO FIREBASE AQUI
     const firebaseConfig = {
-        apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
-        authDomain: "sistemaponto-f4263.firebaseapp.com",
-        projectId: "sistemaponto-f4263",
-        storageBucket: "sistemaponto-f4263.firebasestorage.app",
-        messagingSenderId: "705613037858",
-        appId: "1:705613037858:web:8c364ffcfb05074596257b",
-        measurementId: "G-GRL6HE1KZM"
+        apiKey: "SUA_API_KEY",
+        authDomain: "SEU_DOMINIO.firebaseapp.com",
+        projectId: "SEU_PROJECT_ID",
+        storageBucket: "SEU_BUCKET",
+        messagingSenderId: "SEU_SENDER_ID",
+        appId: "SEU_APP_ID"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -120,54 +61,56 @@
 
     let usuarioLogado = null;
 
+    // Coordenadas exatas e raio permitido (50 metros)
     const EMPRESA_LAT = -27.34429378622745;
     const EMPRESA_LON = -51.61002715891619;
     const RAIO_MAXIMO_METROS = 50;
 
+    // Verifica usuário logado e permissões
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             usuarioLogado = user;
-            try {
-                const docRef = doc(db, "usuarios", user.uid);
-                const docSnap = await getDoc(docRef);
+            const docRef = doc(db, "usuarios", user.uid);
+            const docSnap = await getDoc(docRef);
 
-                if (docSnap.exists()) {
-                    const dados = docSnap.data();
-                    document.getElementById('saudacao').innerText = `Olá, ${dados.nome}`;
-                    
-                    if (dados.tipo === 'admin') {
-                        document.getElementById('btn-voltar-admin').style.display = 'block';
-                    }
-                    
-                    carregarRegistrosHoje();
-                } else {
-                    document.getElementById('saudacao').innerText = "Erro: Usuário não cadastrado.";
+            if (docSnap.exists()) {
+                const dados = docSnap.data();
+                document.getElementById('saudacao').innerText = `Olá, ${dados.nome}`;
+                
+                // Se for admin, mostra o botão de voltar ao painel admin
+                if (dados.tipo === 'admin') {
+                    document.getElementById('btn-voltar-admin').style.display = 'block';
                 }
-            } catch (err) {
-                console.error("Erro ao buscar dados do usuário:", err);
+                
+                carregarRegistrosHoje();
+            } else {
+                alert("Erro: Usuário não encontrado no banco de dados.");
             }
         } else {
             window.location.href = "index.html";
         }
     });
 
+    // Navegação do Admin
     document.getElementById('btn-voltar-admin').addEventListener('click', () => {
         window.location.href = 'admin.html';
     });
 
+    // Função para calcular distância (Fórmula de Haversine)
     function calcularDistancia(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; 
+        const R = 6371e3; // Raio da Terra em metros
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                   Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                   Math.sin(dLon/2) * Math.sin(dLon/2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c; 
+        return R * c; // Distância em metros
     }
 
+    // Função de Bater Ponto
     async function baterPonto(tipoBatida) {
-        alert("Verificando sua localização pelo GPS. Aguarde...");
+        alert("Validando sua localização. Aguarde um momento...");
 
         if (!navigator.geolocation) {
             alert("Erro: Seu navegador não suporta geolocalização.");
@@ -181,7 +124,7 @@
             const distancia = calcularDistancia(latUsuario, lonUsuario, EMPRESA_LAT, EMPRESA_LON);
             
             if (distancia > RAIO_MAXIMO_METROS) {
-                alert(`PONTO NEGADO! Você está a ${Math.round(distancia)} metros da empresa. O limite máximo é de ${RAIO_MAXIMO_METROS} metros.`);
+                alert(`Ponto negado! Você está a ${Math.round(distancia)} metros da empresa. O limite é ${RAIO_MAXIMO_METROS} metros.`);
                 return; 
             }
 
@@ -196,16 +139,15 @@
 
                 alert(`Ponto registrado com sucesso! (${tipoBatida})`);
                 carregarRegistrosHoje();
-                
             } catch (error) {
                 alert("Erro ao salvar no banco de dados: " + error.message);
             }
 
         }, (error) => {
             let msg = "Não foi possível verificar a localização.";
-            if (error.code === 1) msg = "PONTO NEGADO: Permissão de GPS negada no navegador.";
-            else if (error.code === 2) msg = "Sinal de GPS indisponível.";
-            else if (error.code === 3) msg = "Tempo limite do GPS esgotado.";
+            if (error.code === 1) msg = "Permissão de GPS negada. Autorize no navegador para bater o ponto.";
+            else if (error.code === 2) msg = "Sinal de GPS indisponível no momento.";
+            else if (error.code === 3) msg = "Tempo limite para encontrar o GPS esgotado.";
             alert(msg);
         }, {
             enableHighAccuracy: true,
@@ -214,51 +156,48 @@
         });
     }
 
+    // Atribuindo eventos aos botões
     document.getElementById('btn-entrada').addEventListener('click', () => baterPonto('Entrada'));
     document.getElementById('btn-almoco-ida').addEventListener('click', () => baterPonto('Ida Almoço'));
     document.getElementById('btn-almoco-volta').addEventListener('click', () => baterPonto('Volta Almoço'));
     document.getElementById('btn-saida').addEventListener('click', () => baterPonto('Saída'));
 
+    // Carregar histórico do dia
     async function carregarRegistrosHoje() {
         if (!usuarioLogado) return;
         
-        try {
-            const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-            const inicioDia = new Date(hoje + "T00:00:00-03:00").toISOString();
-            const fimDia = new Date(hoje + "T23:59:59-03:00").toISOString();
+        const hoje = new Date().toISOString().split('T')[0]; // Pega a data YYYY-MM-DD
+        const inicioDia = hoje + "T00:00:00.000Z";
+        const fimDia = hoje + "T23:59:59.999Z";
 
-            const q = query(
-                collection(db, "registros"),
-                where("uid", "==", usuarioLogado.uid),
-                where("data_hora", ">=", inicioDia),
-                where("data_hora", "<=", fimDia),
-                orderBy("data_hora", "asc")
-            );
+        const q = query(
+            collection(db, "registros"),
+            where("uid", "==", usuarioLogado.uid),
+            where("data_hora", ">=", inicioDia),
+            where("data_hora", "<=", fimDia),
+            orderBy("data_hora", "asc")
+        );
 
-            const querySnapshot = await getDocs(q);
-            const lista = document.getElementById('lista-pontos');
-            lista.innerHTML = '';
+        const querySnapshot = await getDocs(q);
+        const lista = document.getElementById('lista-pontos');
+        lista.innerHTML = '';
 
-            if (querySnapshot.empty) {
-                lista.innerHTML = 'Nenhum ponto registrado hoje.';
-                return;
-            }
-
-            querySnapshot.forEach((docSnap) => {
-                const data = docSnap.data();
-                const dataFormatada = new Date(data.data_hora).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-                lista.innerHTML += `<div class="registro-item"><strong>${data.tipo_batida}</strong> <span>${dataFormatada}</span></div>`;
-            });
-        } catch (e) {
-            console.error("Erro ao carregar registros do dia:", e);
+        if (querySnapshot.empty) {
+            lista.innerHTML = 'Nenhum ponto registrado hoje.';
+            return;
         }
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            const dataFormatada = new Date(data.data_hora).toLocaleTimeString('pt-BR');
+            lista.innerHTML += `<div class="registro-item"><strong>${data.tipo_batida}</strong>: ${dataFormatada}</div>`;
+        });
     }
 
+    // Botão Sair
     document.getElementById('btn-sair').addEventListener('click', () => {
         signOut(auth).then(() => {
             window.location.href = "index.html";
-        }).catch((error) => {
-            console.error("Erro ao sair:", error);
         });
     });
 </script>
