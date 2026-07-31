@@ -82,6 +82,12 @@
         }
         .btn-acao:hover { background: #4338ca; }
 
+        .btn-excel {
+            background: #059669;
+            margin-top: 8px;
+        }
+        .btn-excel:hover { background: #047857; }
+
         .voltar { background: #6c757d; }
         .voltar:hover { background: #5a6268; }
 
@@ -150,7 +156,7 @@
 
         <hr>
 
-        <h3>Consultar e Corrigir Histórico de Pontos</h3>
+        <h3>Consultar, Corrigir e Calcular Saldo de Horas</h3>
         <select id="select-funcionario" onchange="carregarDadosFuncionarioAdmin()">
             <option value="">Selecione um funcionário...</option>
         </select>
@@ -159,13 +165,15 @@
             Selecione um funcionário acima para ver e editar os registros.
         </div>
 
+        <button class="btn-excel" onclick="exportarExcel()" id="btn-exportar" style="display:none;">Exportar Relatório do Mês (Excel/CSV)</button>
+
         <button class="voltar" onclick="window.location.href='index.html'" style="margin-top: 12px;">Sair / Voltar ao Início</button>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, updateDoc, addDoc, collection, getDocs, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCfkmIO8-XHvr49qmVZg2qUwKKGBIkNMcM",
@@ -180,6 +188,9 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        let registrosCacheAdmin = [];
+        let dadosFuncionarioCache = null;
 
         window.cadastrarFuncionario = async function() {
             const nome = document.getElementById('nome').value;
@@ -312,22 +323,78 @@
         window.carregarDadosFuncionarioAdmin = async function() {
             const uidSelecionado = document.getElementById('select-funcionario').value;
             const container = document.getElementById('resultado-admin');
+            const btnExportar = document.getElementById('btn-exportar');
             
-            if (!uidSelecionado) { container.innerHTML = "Selecione um funcionário..."; return; }
-            container.innerHTML = "Carregando registros...";
+            if (!uidSelecionado) { 
+                container.innerHTML = "Selecione um funcionário..."; 
+                btnExportar.style.display = 'none';
+                return; 
+            }
+            container.innerHTML = "Carregando registros e calculando horas...";
+
+            const userDoc = await getDoc(doc(db, "usuarios", uidSelecionado));
+            if (userDoc.exists()) dadosFuncionarioCache = userDoc.data();
 
             const q = query(collection(db, "registros"), where("uid", "==", uidSelecionado));
             const querySnapshot = await getDocs(q);
 
+            registrosCacheAdmin = [];
+            querySnapshot.forEach((docSnap) => registrosCacheAdmin.push({ id: docSnap.id, ...docSnap.data() }));
+            registrosCacheAdmin.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
+
             let html = "";
-            if (querySnapshot.empty) {
+            if (registrosCacheAdmin.length === 0) {
                 html = "Nenhum registro de ponto encontrado.";
             } else {
-                let registrosArray = [];
-                querySnapshot.forEach((docSnap) => registrosArray.push({ id: docSnap.id, ...docSnap.data() }));
-                registrosArray.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
+                let diasUnicos = {};
+                registrosCacheAdmin.forEach(reg => {
+                    let dStr = new Date(reg.data_hora).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                    if (!diasUnicos[dStr]) diasUnicos[dStr] = [];
+                    diasUnicos[dStr].push(reg);
+                });
 
-                registrosArray.forEach(reg => {
+                let [hE1, mE1] = (dadosFuncionarioCache.entrada1 || "08:00").split(':').map(Number);
+                let [hS1, mS1] = (dadosFuncionarioCache.saida1 || "12:00").split(':').map(Number);
+                let [hE2, mE2] = (dadosFuncionarioCache.entrada2 || "13:00").split(':').map(Number);
+                let [hS2, mS2] = (dadosFuncionarioCache.saida2 || "17:00").split(':').map(Number);
+                let minutosJornadaDiaria = ((hS1*60 + mS1) - (hE1*60 + mE1)) + ((hS2*60 + mS2) - (hE2*60 + mE2));
+
+                let diferencaTotalMinutos = 0;
+
+                // Cálculo com desconto de 10 minutos de tolerância na diferença
+                Object.values(diasUnicos).forEach(regsDia => {
+                    regsDia.sort((a, b) => new Date(a.data_hora) - new Date(b.data_hora));
+                    let minutosTrabalhadosHoje = 0;
+                    for (let i = 0; i < regsDia.length - 1; i += 2) {
+                        let t1 = new Date(regsDia[i].data_hora).getTime();
+                        let t2 = new Date(regsDia[i+1].data_hora).getTime();
+                        minutosTrabalhadosHoje += (t2 - t1) / 60000;
+                    }
+
+                    let diffDia = minutosTrabalhadosHoje - minutosJornadaDiaria;
+                    
+                    if (diffDia > 10) {
+                        diffDia -= 10; // Soma apenas o que passou de 10 min de hora extra
+                    } else if (diffDia < -10) {
+                        diffDia += 10; // Debita apenas o que passou de 10 min de atraso
+                    } else {
+                        diffDia = 0; // Dentro dos 10 minutos, não soma nem debita
+                    }
+
+                    diferencaTotalMinutos += diffDia;
+                });
+
+                let diferencaMinutosArredondada = Math.round(diferencaTotalMinutos);
+                let sinal = diferencaMinutosArredondada >= 0 ? "+" : "-";
+                let diffAbs = Math.abs(diferencaMinutosArredondada);
+                let horasDiff = Math.floor(diffAbs / 60);
+                let minsDiff = diffAbs % 60;
+
+                html += `<div style="background:#eef2ff; padding:8px; border-radius:6px; margin-bottom:8px; font-weight:600; color:#3730a3;">
+                    Balanço Total (desc. 10min tolerância): <span style="color:${diferencaMinutosArredondada >= 0 ? 'var(--success)' : 'var(--danger)'}">${sinal}${horasDiff}h ${minsDiff}m</span>
+                </div>`;
+
+                registrosCacheAdmin.forEach(reg => {
                     let dataFormatada = "Data inválida";
                     let d = new Date(reg.data_hora);
                     if (!isNaN(d.getTime())) dataFormatada = d.toLocaleString("pt-BR", { timeZone: 'America/Sao_Paulo' });
@@ -341,6 +408,28 @@
                 });
             }
             container.innerHTML = html;
+            btnExportar.style.display = 'block';
+        };
+
+        window.exportarExcel = function() {
+            if (registrosCacheAdmin.length === 0) {
+                alert("Sem dados para exportar.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,Tipo de Batida,Data e Hora\n";
+            registrosCacheAdmin.forEach(reg => {
+                let dStr = new Date(reg.data_hora).toLocaleString("pt-BR", { timeZone: 'America/Sao_Paulo' });
+                csvContent += `"${reg.tipo_batida}","${dStr}"\n`;
+            });
+
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `relatorio_ponto_${dadosFuncionarioCache ? dadosFuncionarioCache.nome : 'funcionario'}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         };
 
         window.editarPonto = async function(idRegistro, dataAtualStr) {
